@@ -440,7 +440,6 @@ class ScrollArea(ttk.Frame):
         self.bar=ttk.Scrollbar(self,command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.bar.set)
         self.canvas.pack(side='left',fill='both',expand=True)
-        self.bar.pack(side='right',fill='y')
         self.body=ttk.Frame(self.canvas)
         self.window=self.canvas.create_window((0,0),window=self.body,anchor='nw')
         self._job=None;self._width=0
@@ -450,6 +449,8 @@ class ScrollArea(ttk.Frame):
         # A per-container bindtag prevents wheel handlers leaking to other pages.
         self._wheel_tag='ScrollArea'+str(id(self))
         self.bind_class(self._wheel_tag,'<MouseWheel>',self.wheel)
+        self.bind_class(self._wheel_tag,'<Destroy>',self.schedule)
+        self.bind_class(self._wheel_tag,'<Unmap>',self.schedule)
     def resize(self,event):
         if self._width!=event.width:
             self._width=event.width
@@ -459,12 +460,19 @@ class ScrollArea(ttk.Frame):
         if self._job is None:self._job=self.after_idle(self.refresh)
     def refresh(self):
         self._job=None
+        # Geometry managers retain the old requested size after their last
+        # child disappears. Reset the body's request, retaining natural sizing
+        # so adding new children can grow it again.
+        empty=not any(child.winfo_manager() for child in self.body.winfo_children())
+        if empty and self.body.winfo_reqheight()>max(1,self.body.winfo_pixels(self.body.cget('height'))):
+            self.body.configure(height=max(1,self.body.winfo_pixels(self.body.cget('height'))))
+            self.schedule()
         bounds=self.canvas.bbox('all') or (0,0,0,0)
         self.canvas.configure(scrollregion=(0,0,max(bounds[2],self.canvas.winfo_width()),
                                            max(bounds[3],self.canvas.winfo_height())))
         if bounds[3]<=self.canvas.winfo_height() or self.canvas.canvasy(0)<0:self.canvas.yview_moveto(0)
         self.install_wheel(self.canvas)
-        need=self.body.winfo_reqheight()>self.canvas.winfo_height()+2
+        need=bounds[3]>self.canvas.winfo_height()
         if need and not self.bar.winfo_manager():self.bar.pack(side='right',fill='y')
         elif not need and self.bar.winfo_manager():self.bar.pack_forget()
     def install_wheel(self,widget):
@@ -472,7 +480,7 @@ class ScrollArea(ttk.Frame):
         if self._wheel_tag not in tags:widget.bindtags((tags[0],self._wheel_tag,*tags[1:]))
         for child in widget.winfo_children():self.install_wheel(child)
     def wheel(self,event):
-        if isinstance(event.widget,tk.Text):
+        if isinstance(event.widget,(tk.Text,tk.Listbox,ttk.Treeview)):
             first,last=event.widget.yview()
             if last-first<1-1e-7:return None
         if self.body.winfo_reqheight()>self.canvas.winfo_height():
@@ -482,6 +490,8 @@ class ScrollArea(ttk.Frame):
         if event.widget is self:
             if self._job is not None:self.after_cancel(self._job)
             self.unbind_class(self._wheel_tag,'<MouseWheel>')
+            self.unbind_class(self._wheel_tag,'<Destroy>')
+            self.unbind_class(self._wheel_tag,'<Unmap>')
 
 
 class Tooltip:
@@ -655,7 +665,6 @@ class CardList(ttk.Frame):
         self.bar=ttk.Scrollbar(self,command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.bar.set)
         self.canvas.pack(side='left',fill='both',expand=True)
-        self.bar.pack(side='right',fill='y')
         self.canvas.bind('<Configure>',self.schedule)
         self.canvas.bind('<MouseWheel>',self.wheel)
         self.canvas.bind('<Button-1>',self.click)
@@ -754,7 +763,7 @@ class CardList(ttk.Frame):
                 self.canvas.coords(item,action_x,action_y);self.canvas.itemconfigure(item,image=image)
         total=max(1,len(self.rows)*(h+self.gap)-self.gap)
         self.canvas.configure(scrollregion=(0,0,w,total))
-        needs=total>self.canvas.winfo_height()+2
+        needs=total>self.canvas.winfo_height()
         if needs and not self.bar.winfo_manager():self.bar.pack(side='right',fill='y')
         elif not needs and self.bar.winfo_manager():self.bar.pack_forget()
         self.paint_hover()

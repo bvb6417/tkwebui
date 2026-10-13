@@ -6,6 +6,7 @@ from tkinter import ttk, filedialog
 from .popups import ThemedCombobox, ThemedMenu
 from .extras import MenuButton
 from .table import _sort_key
+from .scrolling import AutoScrollbar
 
 class DataTable(ttk.Frame):
     def __init__(self,master,*,columns,rows=(),page_size=10,height=8,**kwargs):
@@ -41,8 +42,8 @@ class DataTable(ttk.Frame):
         for column in self.columns:
             key=column['key'];self.tree.heading(key,text=column['text'],command=lambda k=key:self.sort_by(k))
             self.tree.column(key,width=round(column['width']*self.dpi),minwidth=60,stretch=key==self.keys[-1])
-        vbar=ttk.Scrollbar(area,command=self.tree.yview);vbar.grid(row=0,column=1,sticky='ns')
-        hbar=ttk.Scrollbar(area,orient='horizontal',command=self.tree.xview);hbar.grid(row=1,column=0,sticky='ew')
+        vbar=AutoScrollbar(area,command=self.tree.yview);vbar.grid(row=0,column=1,sticky='ns')
+        hbar=AutoScrollbar(area,orient='horizontal',command=self.tree.xview);hbar.grid(row=1,column=0,sticky='ew')
         self.tree.configure(yscrollcommand=vbar.set,xscrollcommand=hbar.set)
         self.tree.bind('<<TreeviewSelect>>',self._capture_selection)
         self.tree.bind('<Button-3>',self._context)

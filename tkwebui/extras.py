@@ -257,8 +257,9 @@ class OptionMenu(MenuButton):
 
 class RoundedListbox(tk.Listbox):
     """Native Listbox API, small-radius focus shell, hover rows and native selection."""
-    def __init__(self,master,**kwargs):
+    def __init__(self,master,*,scrollbars=True,**kwargs):
         from .widgets import _TextContainer
+        from .scrolling import _attach_scrollbars
         self.container=_TextContainer(master,style='Web.List.TFrame',padding=6)
         self.container.columnconfigure(0,weight=1);self.container.rowconfigure(0,weight=1)
         kwargs.update(borderwidth=0,highlightthickness=0,relief='flat')
@@ -267,6 +268,7 @@ class RoundedListbox(tk.Listbox):
             kwargs.setdefault(key,value)
         super().__init__(self.container,**kwargs)
         tk.Listbox.grid(self,row=0,column=0,sticky='nsew')
+        if scrollbars:_attach_scrollbars(self,self.container)
         self._hover=None
         self.bind('<FocusIn>',lambda e:self.container.state(['focus']),add='+')
         self.bind('<FocusOut>',lambda e:self.container.state(['!focus']),add='+')
@@ -293,7 +295,10 @@ class RoundedListbox(tk.Listbox):
         options=dict(cnf or {},**kwargs)
         if not options:return super().configure()
         options.update(borderwidth=0,highlightthickness=0,relief='flat')
-        result=super().configure(**options);self._sync();return result
+        result=super().configure(**options)
+        from .scrolling import _release_scrollbars
+        _release_scrollbars(self,options)
+        self._sync();return result
     config=configure
     def destroy(self):
         if getattr(self.container,'_destroying',False):super().destroy()

@@ -17,39 +17,17 @@ BASE = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) el
 sys.path.insert(0, str(BASE))
 
 import tkwebui as ui
-from tkwebui import (RoundedText, SectionCard, configure_table, auto_hide_text_scrollbar, ThemedCombobox, ThemedMenu,
+from tkwebui import (RoundedText, SectionCard, configure_table, ThemedCombobox, ThemedMenu,
                      MenuButton, OptionMenu, RoundedListbox, SquareSwitch, SortableTreeview, Spreadsheet)
 
-PAGES = ['01  输入与按钮', '02  选择与进度', '03  容器与布局', '04  表格与列表', '05  菜单与弹窗', '06  组合组件',
-         '07  单元格表格', '08  原生交互图表', '09  表单与通知', '10  仪表与状态', '11  数据管理', '12  图片与外观']
+PAGES = ['01  输入与按钮', '02  选择与进度', '03  容器与布局', '04  单列、多列与树形列表', '05  菜单与弹窗', '06  组合组件',
+         '07  可编辑表格', '08  原生交互图表', '09  表单与通知', '10  仪表与状态', '11  数据管理', '12  图片与外观']
 
 
-class ScrollPage(ttk.Frame):
+class ScrollPage(ui.ScrollArea):
     def __init__(self, parent):
         super().__init__(parent)
-        self.canvas = tk.Canvas(self, background='white', highlightthickness=0)
-        self.bar = ttk.Scrollbar(self, command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=self.bar.set)
-        self.canvas.pack(side='left', fill='both', expand=True)
-        self.bar.pack(side='right', fill='y')
-        self.body = ttk.Frame(self.canvas, padding=12)
-        self.item = self.canvas.create_window(0, 0, window=self.body, anchor='nw')
-        self.body.bind('<Configure>', lambda e: self.canvas.configure(scrollregion=self.canvas.bbox('all')))
-        self.canvas.bind('<Configure>', lambda e: self.canvas.itemconfigure(self.item, width=e.width))
-        self.bind_all('<MouseWheel>', self.wheel, add='+')
-
-    def wheel(self, event):
-        if not self.winfo_ismapped():
-            return
-        if isinstance(event.widget, (tk.Text, tk.Listbox, ttk.Treeview, ttk.Combobox, tk.Toplevel)):
-            return
-        widget = event.widget
-        while widget is not None:
-            if widget is self:
-                if self.canvas.yview() != (0.0, 1.0):
-                    self.canvas.yview_scroll(-int(event.delta / 120), 'units')
-                return
-            widget = getattr(widget, 'master', None)
+        self.body.configure(padding=12)
 
 
 class Gallery(tk.Tk):
@@ -111,7 +89,7 @@ class Gallery(tk.Tk):
         toolbar = ttk.Frame(self, padding=(self.px(16), self.px(10)))
         toolbar.pack(fill='x')
         ttk.Button(toolbar, text='‹', width=3, command=lambda: self.navigate(-1)).pack(side='left')
-        selector = ThemedCombobox(toolbar, textvariable=self.page_var, values=PAGES, state='readonly', width=21)
+        selector = ThemedCombobox(toolbar, textvariable=self.page_var, values=PAGES, state='readonly', width=27)
         self.refs['page_selector'] = selector
         selector.pack(side='left', padx=self.px(8))
         selector.bind('<<ComboboxSelected>>', lambda e: self.show_page(PAGES.index(self.page_var.get())))
@@ -147,7 +125,8 @@ class Gallery(tk.Tk):
         self.pages[index].pack(fill='both', expand=True)
         self.active_page = index
         self.page_var.set(PAGES[index])
-        self.status.set(f'{PAGES[index]}  ·  单击操作 · 表头排序 · 支持键盘与复制粘贴')
+        hint = {3: '单列 / 多列 / 树形列表；多列列表支持表头排序', 6: '按单元格选择；双击编辑；支持与 Excel 复制粘贴'}.get(index, '可直接操作控件')
+        self.status.set(f'{PAGES[index]}  ·  {hint}')
 
     def card(self, parent, title, row, col=0, span=1):
         box = ui.Card(parent, padding=self.px(16))
@@ -194,10 +173,7 @@ class Gallery(tk.Tk):
         area.columnconfigure(0, weight=1); area.rowconfigure(0, weight=1)
         editor = RoundedText(area, height=8, width=20, wrap='word', undo=True)
         editor.grid(row=0, column=0, sticky='nsew')
-        scrollbar = ttk.Scrollbar(area, command=editor.yview); scrollbar.grid(row=0, column=1, sticky='ns')
-        editor.configure(yscrollcommand=scrollbar.set)
         editor.insert('1.0', '这是一段可编辑的多行文本。\n\n观察边框圆角、内边距、焦点以及文字选择。\n\n可直接输入，按 Ctrl+Z 撤销。')
-        auto_hide_text_scrollbar(editor)
         self.refs['text'] = editor
         self.note(box, 'RoundedText 保留原生 Text 接口；ThemedCombobox 使用统一的下拉浮层。')
         box = self.card(page, '按钮层级', 1, span=2)
@@ -314,13 +290,13 @@ class Gallery(tk.Tk):
         ttk.Separator(box).pack(fill='x')
 
     def tables(self, page):
-        box = self.card(page, '表格与按需滚动条', 0, span=2)
+        box = self.card(page, '多列列表 · 整行选择 / 表头排序', 0, span=2)
         area = ttk.Frame(box); area.pack(fill='both', expand=True)
         area.rowconfigure(0, weight=1); area.columnconfigure(0, weight=1)
         tree = SortableTreeview(area, columns=('name', 'type', 'state', 'date'), show='headings', height=6, selectmode='extended')
-        for key, title, width in [('name', '名称', 310), ('type', '数量', 110), ('state', '状态', 110), ('date', '更新日期', 150)]:
-            tree.heading(key, text=title)
-            tree.column(key, width=self.px(width), minwidth=self.px(80))
+        for key, title, width, anchor in [('name', '名称', 310, 'w'), ('type', '数量', 110, 'e'), ('state', '状态', 110, 'center'), ('date', '更新日期', 150, 'center')]:
+            tree.heading(key, text=title, anchor=anchor)
+            tree.column(key, width=self.px(width), minwidth=self.px(80), anchor=anchor)
         for i in range(18):
             tree.insert('', 'end', iid=f'r{i}', values=(f'{i+1:02d}  项目资料 / 示例条目', [2, 10, 3][i%3], ['已完成', '待处理'][i%2], '2026-10-12'))
         tree.selection_set('r1')
@@ -330,21 +306,28 @@ class Gallery(tk.Tk):
         tree.configure(yscrollcommand=vertical.set, xscrollcommand=horizontal.set)
         configure_table(tree)
         self.refs['table'] = tree
-        self.note(box, '点击表头排序（数字按数值、文本按自然顺序）；Ctrl / Shift 多选；调整窗口观察列宽和滚动条。')
-        box = self.card(page, '树形节点', 1)
-        tree = ttk.Treeview(box, height=7, show='tree', selectmode='browse'); tree.pack(fill='both', expand=True)
+        self.note(box, '名称左对齐、数量右对齐、状态和日期居中；column(anchor=...) 设置表项，heading(anchor=...) 设置表头。点击表头排序；Ctrl / Shift 多选。')
+        box = self.card(page, '树形列表 · 层级节点 / 展开折叠', 1)
+        area = ttk.Frame(box); area.pack(fill='both', expand=True)
+        area.columnconfigure(0, weight=1); area.rowconfigure(0, weight=1)
+        tree = ttk.Treeview(area, height=7, show='tree', selectmode='browse'); tree.grid(row=0, column=0, sticky='nsew')
+        vertical = ui.AutoScrollbar(area, command=tree.yview); vertical.grid(row=0, column=1, sticky='ns')
+        horizontal = ui.AutoScrollbar(area, orient='horizontal', command=tree.xview); horizontal.grid(row=1, column=0, sticky='ew')
+        tree.configure(yscrollcommand=vertical.set, xscrollcommand=horizontal.set)
+        self.refs['tree_list'] = tree
         for title in ['工作空间', '个人收藏']:
             item = tree.insert('', 'end', text=title, open=True)
             for name in ['文档', '图片', '归档']:
                 child = tree.insert(item, 'end', text=name)
                 tree.insert(child, 'end', text='示例文件')
         self.note(box, '树形展开箭头、节点间距与选中状态均已统一。')
-        box = self.card(page, '列表选择框', 1, 1)
+        box = self.card(page, '单列列表 · 单列选项 / 多选', 1, 1)
         listbox = RoundedListbox(box, height=7, selectmode='extended', exportselection=False)
         listbox.pack(fill='both', expand=True)
         for label in ['全部项目', '最近使用', '已收藏', '待处理', '已完成', '已归档', '回收站']:
             listbox.insert('end', label)
         listbox.selection_set(2)
+        self.refs['single_list'] = listbox
         self.note(box, 'RoundedListbox 使用小圆角外框，支持悬停、多选与原生 Listbox 接口。')
 
     def make_menu(self, parent):
@@ -452,7 +435,7 @@ class Gallery(tk.Tk):
         return window
 
     def spreadsheet_page(self, page):
-        box = self.card(page, 'Excel 式单元格表格', 0, span=2)
+        box = self.card(page, '可编辑表格 · 单元格选择 / 编辑 / 复制粘贴', 0, span=2)
         actions = ttk.Frame(box); actions.pack(fill='x', pady=(0, self.px(10)))
         data = [['项目', '数量', '单价', '备注'], ['资料整理', '12', '25.50', '双击编辑'],
                 ['图片归档', '8', '10.00', 'Ctrl+C / Ctrl+V'], ['数据校对', '20', '8.50', 'Shift 选择矩形区域'],
@@ -576,7 +559,7 @@ class Gallery(tk.Tk):
                            command=lambda t=text: self.status.set(t+'按钮已点击')).pack(side='left', padx=(0, 10))
 
     def dataview_page(self, page):
-        box = self.card(page, '可搜索、筛选和分页的数据表', 0, span=2)
+        box = self.card(page, '多列列表 · 搜索 / 筛选 / 分页', 0, span=2)
         table = ui.DataTable(box, columns=[{'key': 'name', 'text': '文件名称', 'width': 260}, {'key': 'count', 'text': '数量', 'width': 90},
                                            {'key': 'state', 'text': '状态', 'width': 120}, {'key': 'group', 'text': '分组', 'width': 140}],
                              rows=[[f'资料_{i+1:03d}.csv', [2, 10, 30, 5][i%4], ['待处理', '已完成', '处理中'][i%3], ['工作', '个人'][i%2]] for i in range(53)],

@@ -128,7 +128,9 @@ class WindowChrome:
         for name,direction,cursor in [('left',1,'size_we'),('right',2,'size_we'),
                 ('top',3,'size_ns'),('topleft',4,'size_nw_se'),('topright',5,'size_ne_sw'),
                 ('bottom',6,'size_ns'),('bottomleft',7,'size_ne_sw'),('bottomright',8,'size_nw_se')]:
-            color=PALETTE['sidebar'] if 'left' in name else PALETTE['bg']
+            # Only sidebar layouts have a grey left edge. Plain windows must
+            # blend all resize targets, including both left corners, into bg.
+            color=PALETTE['sidebar'] if self.sidebar is not None and 'left' in name else PALETTE['bg']
             handle=tk.Frame(self.root,bg=color,borderwidth=0,highlightthickness=0,cursor=cursor,takefocus=False)
             handle.bind('<ButtonPress-1>',lambda event,d=direction:self.start_resize(d,event))
             if name in ('top','bottom'):

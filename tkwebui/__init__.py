@@ -15,6 +15,7 @@ Every component can also be imported from its own module, e.g.
 """
 __version__ = '0.1.0'
 
+from .scrolling import AutoScrollbar
 from .core import (PALETTE, THEME, enable_dpi_awareness, icon, apply_theme, Card, SegmentedControl,
                    Sidebar, ScrollArea, Tooltip, Dropdown, Accordion, SettingRow, BarChart, CardList,
                    ProgressSlider, Modal)
@@ -32,6 +33,7 @@ from .media import ColorPicker, ColorDialog, FontPicker, FontDialog, ImageViewer
 from .window_chrome import WindowChrome
 
 __all__ = [
+    'AutoScrollbar',
     'PALETTE', 'THEME', 'enable_dpi_awareness', 'icon', 'apply_theme',
     'Card', 'SegmentedControl', 'Sidebar', 'ScrollArea', 'Tooltip', 'Dropdown', 'Accordion', 'SettingRow',
     'BarChart', 'CardList', 'ProgressSlider', 'Modal',

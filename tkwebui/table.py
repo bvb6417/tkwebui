@@ -8,6 +8,7 @@ import re
 import tkinter as tk
 from tkinter import ttk, font as tkfont
 from .core import PALETTE
+from .scrolling import AutoScrollbar
 
 
 def _sort_key(value):
@@ -96,8 +97,8 @@ class Spreadsheet(ttk.Frame):
         self.canvas=tk.Canvas(self,takefocus=True,**canvas_options)
         self.corner.grid(row=0,column=0,sticky='nsew');self.top.grid(row=0,column=1,sticky='ew')
         self.left.grid(row=1,column=0,sticky='ns');self.canvas.grid(row=1,column=1,sticky='nsew')
-        self.vbar=ttk.Scrollbar(self,command=self.yview);self.vbar.grid(row=1,column=2,sticky='ns')
-        self.hbar=ttk.Scrollbar(self,orient='horizontal',command=self.xview);self.hbar.grid(row=2,column=1,sticky='ew')
+        self.vbar=AutoScrollbar(self,command=self.yview);self.vbar.grid(row=1,column=2,sticky='ns')
+        self.hbar=AutoScrollbar(self,orient='horizontal',command=self.xview);self.hbar.grid(row=2,column=1,sticky='ew')
         self.canvas.configure(xscrollcommand=self._xscroll,yscrollcommand=self._yscroll)
         self.status=tk.StringVar(self,value='A1')
         ttk.Label(self,textvariable=self.status,style='Muted.TLabel',padding=(6,5)).grid(row=3,column=0,columnspan=3,sticky='ew')

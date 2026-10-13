@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 from .core import Card, PALETTE, icon, _raster, _rgb
+from .scrolling import _attach_scrollbars, _release_scrollbars
 
 def focus_when_mapped(widget,*,when=None):
     """Hand off focus after a page is mapped; optional predicate cancels stale navigation."""
@@ -51,7 +52,7 @@ class RoundedText(tk.Text):
     Text methods, bindings, tags, undo, selection and scroll commands are native.
     `container` exposes the surrounding ttk.Frame when layout inspection is needed.
     """
-    def __init__(self,master,*,padding=None,**kwargs):
+    def __init__(self,master,*,padding=None,scrollbars=True,**kwargs):
         scale=master.winfo_fpixels('1i')/96
         self.container=_TextContainer(master,style='RoundedText.TFrame',
                                       padding=padding if padding is not None else (round(6*scale),round(4*scale)))
@@ -63,6 +64,7 @@ class RoundedText(tk.Text):
         kwargs.setdefault('selectbackground',PALETTE['selected']);kwargs.setdefault('selectforeground',PALETTE['fg'])
         super().__init__(self.container,**kwargs)
         tk.Text.grid(self,row=0,column=0,sticky='nsew')
+        if scrollbars:_attach_scrollbars(self,self.container)
         self.bind('<FocusIn>',lambda _:self.container.state(['focus']),add='+')
         self.bind('<FocusOut>',lambda _:self.container.state(['!focus']),add='+')
         self._sync_shell()
@@ -80,6 +82,7 @@ class RoundedText(tk.Text):
         if options:
             options.update(borderwidth=0,highlightthickness=0,relief='flat')
             result=super().configure(**options)
+            _release_scrollbars(self,options)
             self._sync_shell();return result
         return super().configure()
     config=configure
