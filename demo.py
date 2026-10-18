@@ -156,6 +156,8 @@ class Gallery(tk.Tk):
         entry = self.field(box, '普通输入', ttk.Entry(box))
         entry.insert(0, '项目资料 / Project notes')
         self.refs['entry'] = entry
+        hint = self.field(box, '输入提示（框内灰字，输入后消失）', ui.PlaceholderEntry(box, placeholder='请输入用户名'))
+        self.refs['placeholder'] = hint
         pw = self.field(box, '密码输入', ttk.Entry(box, show='●'))
         pw.insert(0, 'tkwebui')
         invalid = self.field(box, '错误状态', ttk.Entry(box))
@@ -168,6 +170,8 @@ class Gallery(tk.Tk):
         editable.set('工作资料'); self.refs['combo'] = editable
         readonly = self.field(box, '只读下拉框', ThemedCombobox(box, values=['普通', '重要', '稍后处理'], state='readonly'))
         readonly.current(1)
+        choose = self.field(box, '未选择时的提示', ThemedCombobox(box, values=['普通', '重要', '稍后处理'], state='readonly'))
+        ui.set_placeholder(choose, '请选择优先级…')
         ttk.Label(box, text='多行文本  ·  可编辑 / 撤销').pack(anchor='w', pady=(self.px(12), self.px(6)))
         area = ttk.Frame(box); area.pack(fill='both', expand=True)
         area.columnconfigure(0, weight=1); area.rowconfigure(0, weight=1)

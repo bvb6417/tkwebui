@@ -50,7 +50,7 @@
 | --- | --- |
 | 原生 ttk 控件（自动套用样式） | Button、Entry、Spinbox、Checkbutton、Radiobutton、LabelFrame、Notebook、Panedwindow、Treeview、Progressbar、Scale、Scrollbar、Separator、Sizegrip |
 | 按钮与选择 | 主按钮 / 轻量按钮 / 语义色按钮（实心、描边、链接）、ToggleButton、ToolButton、圆形开关、SquareSwitch、SegmentedControl、Dropdown |
-| 输入 | RoundedText、ThemedCombobox、DateEntry（带日历）、ValidatedEntry（表单校验）、ValueSlider、ProgressSlider |
+| 输入 | RoundedText、ThemedCombobox、DateEntry（带日历）、ValidatedEntry（表单校验）、PlaceholderEntry / set_placeholder（输入提示灰字）、ValueSlider、ProgressSlider |
 | 菜单与弹窗 | ThemedMenu（图标、快捷键文字、勾选/单选、级联子菜单、键盘操作）、MenuButton、OptionMenu、Modal、Dialogs、Tooltip、notify 轻提示 |
 | 表格与列表 | SortableTreeview（表头点击排序、自然排序）、**Spreadsheet（Excel 式单元格表格）**、DataTable（搜索、筛选、分页、列管理、CSV 导出）、RoundedListbox |
 | 图表 | LineChart、ColumnChart、ScatterChart、DonutChart、PieChart：悬停提示、图例开关、点击回调、滚轮缩放与拖动平移 |
@@ -67,6 +67,18 @@
 - 只绘制可见区域，默认最多支持 100 万个单元格。
 
 它只处理单元格的值，不读写 xlsx 文件，也不做公式计算和格式复制。
+
+### 输入提示（灰字）
+
+框内为空时显示浅灰色提示，开始输入后消失：
+
+```python
+ui.PlaceholderEntry(parent, placeholder='请输入用户名')
+ui.set_placeholder(existing_entry, '搜索')       # 已有的 Entry / Combobox / Spinbox / tk.Entry
+ui.set_placeholder(readonly_combo, '请选择…')    # 只读下拉框未选择时
+```
+
+提示是浮在输入框上的标签，不是框里的文字：`get()` 和 `textvariable` 始终是真实内容（为空就是空字符串），密码框、输入校验与只读状态不受影响；获得焦点后提示仍显示，直到开始输入。没有 `textvariable` 的输入框会自动绑定一个内部变量来感知内容变化。
 
 ## 截图
 

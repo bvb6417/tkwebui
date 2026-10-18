@@ -13,9 +13,10 @@ apply_theme(root) before creating widgets:
 Every component can also be imported from its own module, e.g.
 ``from tkwebui.charts import LineChart``.
 """
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 from .scrolling import AutoScrollbar
+from .placeholder import set_placeholder, PlaceholderEntry
 from .core import (PALETTE, THEME, enable_dpi_awareness, icon, apply_theme, Card, SegmentedControl,
                    Sidebar, ScrollArea, Tooltip, Dropdown, Accordion, SettingRow, BarChart, CardList,
                    ProgressSlider, Modal)
@@ -33,7 +34,7 @@ from .media import ColorPicker, ColorDialog, FontPicker, FontDialog, ImageViewer
 from .window_chrome import WindowChrome
 
 __all__ = [
-    'AutoScrollbar',
+    'AutoScrollbar', 'set_placeholder', 'PlaceholderEntry',
     'PALETTE', 'THEME', 'enable_dpi_awareness', 'icon', 'apply_theme',
     'Card', 'SegmentedControl', 'Sidebar', 'ScrollArea', 'Tooltip', 'Dropdown', 'Accordion', 'SettingRow',
     'BarChart', 'CardList', 'ProgressSlider', 'Modal',

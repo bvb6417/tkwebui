@@ -90,7 +90,7 @@ button.pack()
 
 ↑/↓ 选择，→ 展开子菜单，←/Escape 返回上一层，最外层 Escape 关闭；点击外部或窗口失去焦点时关闭并恢复抓取。快捷键文字仅作展示，实际快捷键由应用自己绑定。菜单栏未封装为单独组件，可以用 MenuButton 按工具栏布局组合。
 
-## 可排序列表
+## 多列列表（可排序）
 
 ```python
 from tkwebui import SortableTreeview
@@ -109,7 +109,25 @@ tree.insert('', 'end', values=('资料 10', 2))
 - `configure_table` 的自动列宽和按需滚动条针对带表头的平面列表；树节点直接用 ttk.Treeview。
 - RoundedListbox 是无表头的原生 Listbox 子类，适用于单列选项，不负责列排序。
 
-## 单元格表格
+### 多列列表框的对齐方式
+
+`ttk.Treeview` 和 `SortableTreeview` 使用相同的原生接口。`anchor='w'` 为左对齐，`'center'` 为居中，`'e'` 为右对齐；表项和表头分别设置，互不影响：
+
+```python
+tree.column('name', anchor='w')       # 名称列的表项左对齐
+tree.column('count', anchor='e')      # 数量列的表项右对齐
+tree.heading('name', anchor='w')      # 名称列的表头左对齐
+tree.heading('count', anchor='e')     # 数量列的表头右对齐
+
+# 所有列的表项和表头都居中
+for key in tree['columns']:
+    tree.column(key, anchor='center')
+    tree.heading(key, anchor='center')
+```
+
+可在创建列后或运行期间设置；排序、`configure_table(tree)` 和窗口缩放不会改变对齐设置。`DataTable` 的底层列表为 `table.tree`，例如 `table.tree.column('count', anchor='e')`。这是整列设置，不能给同一列的不同行分别指定对齐方式。树形列表的树节点列使用 `tree.column('#0', anchor='w')`。
+
+## 可编辑表格（单元格）
 
 ```python
 from tkwebui import Spreadsheet
@@ -149,7 +167,36 @@ sheet.undo() / redo()
 
 RoundedText 保留 Text 的编辑、撤销、tags 与滚动接口；RoundedListbox 保留 Listbox 的选择和列表 API。二者的 pack/grid/place 作用于圆角外壳，文本/列表方法和 `winfo_*` 作用于内部原生控件。
 
+Demo 第 04 页分别展示「单列列表」（RoundedListbox）、「多列列表」（SortableTreeview）和「树形列表」（ttk.Treeview）；第 07 页的「可编辑表格」（Spreadsheet）按单元格选择、编辑和复制粘贴。多列列表按整行选择，不等同于可编辑表格。
+
+### 按需滚动条
+
+滚动条默认不占空间，仅在内容超出当前可视区域时出现；删除内容、清除筛选或扩大窗口后，内容能完整显示时自动隐藏。横向和纵向分别判断，不按固定条目数判断。
+
+- RoundedText、RoundedListbox 内置按需滚动条；文本自动换行时不显示无用的横向滚动条。传入 `scrollbars=False` 可关闭内置滚动条。设置自己的 `xscrollcommand` / `yscrollcommand` 时，对应方向交由调用方管理，避免重复滚动条。
+- Spreadsheet 根据实际行列区域显示滚动条；空白单元格也是可编辑区域的一部分。
+- DataTable 根据当前页及筛选后的可见条目显示滚动条。
+- ScrollArea、卡片列表，以及使用 ScrollArea 的下拉选项和菜单浮层按内容高度显示滚动条。
+- 原生 ttk.Treeview 不自带滚动条。多列列表可配合 `configure_table(tree)` 管理已有滚动条并启用表头排序；树形列表或普通滚动控件可使用 `AutoScrollbar`。
+
+```python
+from tkwebui import AutoScrollbar
+area = ttk.Frame(parent)
+area.pack(fill='both', expand=True)
+area.columnconfigure(0, weight=1)
+area.rowconfigure(0, weight=1)
+tree = ttk.Treeview(area)
+tree.grid(row=0, column=0, sticky='nsew')
+bar = AutoScrollbar(area, command=tree.yview)
+bar.grid(row=0, column=1, sticky='ns')
+tree.configure(yscrollcommand=bar.set)
+```
+
+AutoScrollbar 使用 `grid` 布局，以便隐藏和恢复时保留布局位置。外层容器仍可以使用 `pack` 或 `place`。`apply_theme()` 只负责样式；普通 `ttk.Treeview` 的表头排序需要显式调用 `enable_sorting(tree)` / `configure_table(tree)`，或改用 `SortableTreeview`。
+
 WindowChrome 提供置顶、最小化、最大化、移动和边缘缩放；关闭窗口前调用 `detach()`。非 Windows 平台保留系统标题栏。尚未提供 Windows 11 最大化按钮的悬停布局面板。
+
+普通窗口无需传入 `sidebar`，四周缩放区域与主背景同色；只有左侧确实存在侧栏时才传入 `sidebar=sidebar_widget`，以保持左边缘与侧栏底色一致。
 
 ## 打包后的路径
 
