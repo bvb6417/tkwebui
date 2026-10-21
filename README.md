@@ -14,6 +14,24 @@
 
 ![Excel 式单元格表格：矩形选区与 Ctrl+点击追加的非连续选区](docs/images/spreadsheet-selection.png)
 
+## 如何选择：TkWebUI 还是 TkWin11
+
+[TkWin11](https://github.com/bvb6417/tkwin11) 由 TkWebUI 分支而来，两者的控件大体相同，取舍不同：
+
+| | TkWebUI | TkWin11 |
+| --- | --- | --- |
+| 外观 | 现代 Web 应用风格 | Windows 11 Fluent |
+| 实现 | 样式一次生成后固定，不改动 Tk 的内部命令；代码量约为 TkWin11 的一半 | 运行时接管样式、图片、字体和控件命令，以支持动画、多显示器 DPI 和一键换肤 |
+| 接入 | 创建窗口后调用 `apply_theme(root)`，换肤 ttk 控件 | 创建窗口前调用 `tkwin11.install()`，`tk.Button`、`tk.Menu` 等经典控件也一起换肤 |
+| 动效 | 无过渡动画 | 悬停、按下、开关、导航和页面切换都有过渡 |
+| 主题开销¹ | 启动约 +0.2 s，切页每页约 +16 ms | 启动约 +0.15 s，首次打开每页约 +70 ms |
+| 平台 | 以 Windows 为主，其他平台使用纯 Python 回退（未测试） | 以 Windows 11 为目标，一体化标题栏和多显示器适配只在 Windows 生效 |
+
+- **选 TkWebUI**：做科研、工程或内部工具，重点是单元格表格、数据表、图表、表单这类干活的组件；希望依赖少、行为可预期，出了问题能直接读懂源码。
+- **选 TkWin11**：做发给 Windows 用户的桌面程序，或想让老 tkinter 程序一行代码换上 Windows 11 的观感；愿意为动效和多显示器适配多付一些开销。
+
+¹ 同一窗口套用主题与不套用主题相比，Windows 11、150% 缩放下实测。两个库不要在同一个 Tk 解释器里混用。
+
 ## 快速开始
 
 1. 在本页点击 **Code → Download ZIP** 并解压（或 `git clone`）。
