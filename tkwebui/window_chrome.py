@@ -184,8 +184,11 @@ class WindowChrome:
             self.set_long(self.hwnd,-16,self.c.c_void_p(updated))
             self.u.SetWindowPos(self.hwnd,None,0,0,0,0,0x0001|0x0002|0x0004|0x0010|0x0020)
         allowed=all(self._resize_axes) or bool(self.u.IsZoomed(self.hwnd))
-        self.max_button.state(['!disabled'] if allowed else ['disabled'])
-        self.paint_control('maximize')
+        # Custom title bars may destroy the built-in controls. Keep syncing
+        # native capabilities and resize handles even when no button remains.
+        if self.max_button.winfo_exists():
+            self.max_button.state(['!disabled'] if allowed else ['disabled'])
+            self.paint_control('maximize')
         if previous!=self._resize_axes:self.layout_resize_handles()
 
     def _install_geometry_bridge(self):
@@ -375,6 +378,8 @@ class WindowChrome:
         self.paint_control('maximize',False)
 
     def paint_control(self,key,hover=False):
+        button=self.buttons.get(key)
+        if button is None or not button.winfo_exists():return
         pinned=key=='pin' and self.pinned
         disabled=self.buttons[key].instate(['disabled'])
         hover=hover and not disabled

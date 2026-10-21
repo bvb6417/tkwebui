@@ -13,7 +13,7 @@ apply_theme(root) before creating widgets:
 Every component can also be imported from its own module, e.g.
 ``from tkwebui.charts import LineChart``.
 """
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 from .scrolling import AutoScrollbar
 from .placeholder import set_placeholder, PlaceholderEntry
