@@ -5,6 +5,7 @@ import sys
 import tkinter as tk
 from tkinter import ttk, font as tkfont
 from .core import PALETTE, Card, ScrollArea, Modal, icon, _patch, _raster, _rgb
+from .tcl_bridge import unbind
 
 
 def configure_extra_styles(root, style):
@@ -19,9 +20,9 @@ def configure_extra_styles(root, style):
             root._tkwebui_images.append(image)
             cache[key] = image
         return cache[key]
-    def surface(name, normal, states=(), radius=4):
+    def surface(name, normal, states=(), radius=4, **options):
         style.element_create(name, 'image', normal, *states, border=px(radius)+1,
-                             width=px(radius)*2+2, height=px(radius)*2+2, sticky='nsew')
+                             width=px(radius)*2+2, height=px(radius)*2+2, sticky='nsew', **options)
     for name, plain in [('Toggle.TButton', False), ('Toolbutton', True)]:
         element = 'Web.'+name+'.surface'
         surface(element, face(c['bg'], c['bg'] if plain else c['border']), [
@@ -31,7 +32,9 @@ def configure_extra_styles(root, style):
             ('selected', face(c['selected'], c['blue'] if not plain else c['selected'])),
             ('focus', face(c['bg'], c['blue'])),
             ('active', face(c['hover'], c['hover'] if plain else c['border'])),
-        ])
+        # Same box as TButton: the style padding alone sets the content inset
+        # (ttk would default an image element's padding to its border).
+        ], padding=0)
         style.layout(name, [(element, {'sticky':'nsew', 'children':[
             ('Checkbutton.padding', {'sticky':'nsew', 'children':[
                 ('Checkbutton.label', {'sticky':'nsew'})]})]})])
@@ -68,7 +71,7 @@ def configure_extra_styles(root, style):
     for name in ('TMenubutton', 'TOptionMenu'):
         style.layout(name, [('TButton.surface', {'sticky':'nsew','children':[
             ('Menubutton.padding', {'sticky':'nsew','children':[
-                ('Switch.Dropdown.arrow', {'side':'right'}),
+                ('Switch.Dropdown.arrow', {'side':'right','sticky':''}),
                 ('Menubutton.label', {'side':'left','sticky':'nsew','expand':True})]})]})])
         style.configure(name, padding=(px(10),px(7)), anchor='w')
         style.map(name, foreground=[('disabled',c['disabled'])])
@@ -129,12 +132,8 @@ def configure_extra_styles(root, style):
                         return _rgb(edge if edge==c['disabled'] else c['blue']) if distance<=px(2) else _rgb(c['bg'])
                     d=math.hypot(x-cx,y-cy)
                     return _rgb(fill) if d<px(7)-1 else _rgb(edge) if d<=px(7) else _rgb(c['bg'])
-                im=_raster(root,size,size,thumb,transparent=_rgb(c['bg']) if variant else None)
-                if not variant:
-                    for yy in range(size):
-                        for xx in range(size):
-                            if math.hypot(xx+.5-size/2,yy+.5-size/2)>px(7)+1:
-                                im.transparency_set(xx,yy,True)
+                im=_raster(root,size,size,thumb,transparent=_rgb(c['bg']) if variant else None,
+                           outside=None if variant else lambda xx,yy,size=size:math.hypot(xx+.5-size/2,yy+.5-size/2)>px(7)+1)
                 root._tkwebui_images.append(im);images.append(im)
             slider_name='Web.'+orient+'.'+variant+'Scale.slider'
             style.element_create(slider_name,'image',images[0],('disabled',images[2]),('pressed',images[1]),('active',images[1]),('focus',images[1]),width=size,height=size,sticky='')
@@ -318,6 +317,27 @@ class RoundedListbox(tk.Listbox):
     def place_info(self):return self.container.place_info()
 
 
+def _monitor_api():
+    """Private user32 prototypes. Setting argtypes on the shared ctypes.windll
+    object would break other code (including the host program) that calls the
+    same functions with its own structures."""
+    global _MONITOR_API
+    if _MONITOR_API is None:
+        import ctypes
+        from types import SimpleNamespace
+        from ctypes import wintypes as w
+        class MonitorInfo(ctypes.Structure):
+            _fields_=[('cbSize',w.DWORD),('rcMonitor',w.RECT),('rcWork',w.RECT),('dwFlags',w.DWORD)]
+        user=ctypes.WinDLL('user32')
+        user.MonitorFromPoint.argtypes=[w.POINT,w.DWORD];user.MonitorFromPoint.restype=w.HANDLE
+        user.GetMonitorInfoW.argtypes=[w.HANDLE,ctypes.POINTER(MonitorInfo)];user.GetMonitorInfoW.restype=w.BOOL
+        _MONITOR_API=SimpleNamespace(ctypes=ctypes,w=w,user=user,MonitorInfo=MonitorInfo)
+    return _MONITOR_API
+
+
+_MONITOR_API=None
+
+
 class MenuPopup(tk.Toplevel):
     """Shared menu renderer with native Menu commands/variables and nested popups."""
     def __init__(self,owner,menu,x,y,*,min_width=190,parent_popup=None,parent_index=None,selected=None):
@@ -402,15 +422,9 @@ class MenuPopup(tk.Toplevel):
     @staticmethod
     def work_area(x,y):
         if sys.platform=='win32':
-            import ctypes
-            from ctypes import wintypes as w
-            class MonitorInfo(ctypes.Structure):
-                _fields_=[('cbSize',w.DWORD),('rcMonitor',w.RECT),('rcWork',w.RECT),('dwFlags',w.DWORD)]
-            user=ctypes.windll.user32
-            user.MonitorFromPoint.argtypes=[w.POINT,w.DWORD];user.MonitorFromPoint.restype=w.HANDLE
-            user.GetMonitorInfoW.argtypes=[w.HANDLE,ctypes.POINTER(MonitorInfo)]
-            info=MonitorInfo();info.cbSize=ctypes.sizeof(info)
-            if user.GetMonitorInfoW(user.MonitorFromPoint(w.POINT(int(x),int(y)),2),ctypes.byref(info)):
+            api=_monitor_api()
+            info=api.MonitorInfo();info.cbSize=api.ctypes.sizeof(info)
+            if api.user.GetMonitorInfoW(api.user.MonitorFromPoint(api.w.POINT(int(x),int(y)),2),api.ctypes.byref(info)):
                 r=info.rcWork;return r.left,r.top,r.right,r.bottom
         root=tk._default_root
         return 0,0,root.winfo_screenwidth(),root.winfo_screenheight()
@@ -496,8 +510,8 @@ class MenuPopup(tk.Toplevel):
             self.parent_popup.child_popup=None
             super().destroy()
             return 'break'
-        if self._host_binding:self.host.unbind('<Configure>',self._host_binding)
-        if self._destroy_binding:self.host.unbind('<Destroy>',self._destroy_binding)
+        if self._host_binding:unbind(self.host,'<Configure>',self._host_binding)
+        if self._destroy_binding:unbind(self.host,'<Destroy>',self._destroy_binding)
         if getattr(self.host,'_choice_popup',None) is self:self.host._choice_popup=None
         self.grab_release();super().destroy()
         try:

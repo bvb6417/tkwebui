@@ -194,6 +194,20 @@ tree.configure(yscrollcommand=bar.set)
 
 AutoScrollbar 使用 `grid` 布局，以便隐藏和恢复时保留布局位置。外层容器仍可以使用 `pack` 或 `place`。`apply_theme()` 只负责样式；普通 `ttk.Treeview` 的表头排序需要显式调用 `enable_sorting(tree)` / `configure_table(tree)`，或改用 `SortableTreeview`。
 
+### 窗口显示后再构建的页面
+
+ScrollArea 的内容宽度、滚动条以及按 `<Configure>` 调整换行的文字，都依赖控件显示到屏幕上之后才到达的窗口事件。窗口显示后再构建并直接 `pack` 的页面，会先按控件的自然宽度画出来，再拉伸到实际宽度。先用 `prepare(width, height)` 在可视区域外按最终尺寸完成布局，再显示：
+
+```python
+page = ui.ScrollArea(deck)
+build(page.body)
+page.prepare(deck.winfo_width(), deck.winfo_height())
+current.pack_forget()          # 构建期间旧页面保持可见
+page.pack(fill='both', expand=True)
+```
+
+`prepare()` 不处理用户输入，只向尺寸变化的控件补发 `<Configure>`。Demo 的 `show_page()` 即按此方式切换页面。
+
 WindowChrome 提供置顶、最小化、最大化、移动和边缘缩放；关闭窗口前调用 `detach()`。非 Windows 平台保留系统标题栏。尚未提供 Windows 11 最大化按钮的悬停布局面板。
 
 普通窗口无需传入 `sidebar`，四周缩放区域与主背景同色；只有左侧确实存在侧栏时才传入 `sidebar=sidebar_widget`，以保持左边缘与侧栏底色一致。

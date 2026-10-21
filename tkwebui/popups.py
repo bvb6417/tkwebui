@@ -2,6 +2,7 @@
 import tkinter as tk
 from tkinter import ttk, font as tkfont
 from .core import Card, ScrollArea, Modal, PALETTE
+from .tcl_bridge import unbind
 
 class ChoicePopup(tk.Toplevel):
     def __init__(self,owner,items,x,y,*,width=180,selected=0,above=None):
@@ -99,7 +100,7 @@ class ChoicePopup(tk.Toplevel):
         if self._closed:return 'break'
         self._closed=True
         if self._focus_job is not None:self.after_cancel(self._focus_job)
-        self.host.unbind('<Configure>',self._host_binding)
+        unbind(self.host,'<Configure>',self._host_binding)
         if getattr(self.host,'_choice_popup',None) is self:self.host._choice_popup=None
         self.grab_release();super().destroy()
         if self.previous_grab is not None and self.previous_grab.winfo_exists():self.previous_grab.grab_set()

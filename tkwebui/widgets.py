@@ -153,7 +153,10 @@ class ResponsiveTable:
         tree.bind('<Configure>',self.schedule,add='+')
         tree.bind('<<ThemeChanged>>',self.theme_changed,add='+')
         tree.bind('<Destroy>',self.cleanup,add='+')
-        self.schedule()
+        # Mark the stretching column now. Treeview columns stretch by default,
+        # so a table laid out before it is shown (ScrollArea.prepare) would
+        # otherwise spread its final width over every column for good.
+        self.refresh()
 
     def schedule(self,event=None):
         if self.job is None:self.job=self.tree.after_idle(self.refresh)
@@ -171,7 +174,6 @@ class ResponsiveTable:
     def refresh(self):
         self.job=None
         tree=self.tree
-        if not tree.winfo_ismapped():return
         display=tree['displaycolumns']
         count=len(tree['columns']) if '#all' in display else len(display)
         visible=tuple(tree.column(f'#{i+1}','id') for i in range(count))
@@ -186,6 +188,7 @@ class ResponsiveTable:
             # Let Tk finish allocating the newly stretchable column before
             # measuring overflow; no reset of the user's other column widths.
             self.schedule();return
+        if not tree.winfo_ismapped():return
         for orientation,view in [('horizontal',tree.xview),('vertical',tree.yview)]:
             bar=self.bars.get(orientation)
             if bar is None:continue

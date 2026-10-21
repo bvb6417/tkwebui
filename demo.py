@@ -53,9 +53,31 @@ class Gallery(tk.Tk):
         self.dialog = None
         self.build()
         self.position()
-        self.show_page(page)
-        self.deiconify()
+        self.reveal(page)
         self.protocol('WM_DELETE_WINDOW', self.close)
+
+    def reveal(self, page):
+        """Show the window only after Tk has applied its size and laid it out.
+
+        Once the native window exists, Tk applies wm geometry at the first map,
+        so a withdrawn window is still 1x1 and the first page would be laid out
+        while visible. On Windows the window is mapped DWM-cloaked (laid out,
+        not composed) until the page has settled.
+        """
+        cloak = None
+        if sys.platform == 'win32':
+            import ctypes
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            def cloak(on):
+                value = ctypes.c_int(on)
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 13, ctypes.byref(value), 4)  # DWMWA_CLOAK
+            cloak(1)
+        self.deiconify()
+        self.update()       # real window size
+        self.show_page(page)
+        self.update()       # page layout, scroll region and wrapping
+        if cloak is not None:
+            cloak(0)
 
     def report_callback_exception(self, exc, value, tb):
         detail = ''.join(traceback.format_exception(exc, value, tb))
@@ -114,14 +136,17 @@ class Gallery(tk.Tk):
     def show_page(self, index):
         if self.active_page == index:
             return
-        if self.active_page in self.pages:
-            self.pages[self.active_page].pack_forget()
         if index not in self.pages:
             page = ScrollPage(self.deck)
             self.pages[index] = page
             page.body.columnconfigure((0, 1), weight=1, uniform='half')
             [self.inputs, self.choices, self.containers, self.tables, self.popups, self.composites, self.spreadsheet_page,
              self.charts_page, self.forms_page, self.feedback_page, self.dataview_page, self.media_page][index](page.body)
+            # Lay the new page out at its final width while the current one is
+            # still shown; otherwise its cards appear narrow and then widen.
+            page.prepare(max(1, self.deck.winfo_width()), max(1, self.deck.winfo_height()))
+        if self.active_page in self.pages:
+            self.pages[self.active_page].pack_forget()
         self.pages[index].pack(fill='both', expand=True)
         self.active_page = index
         self.page_var.set(PAGES[index])

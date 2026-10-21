@@ -5,6 +5,7 @@ from tkinter import ttk
 from .core import PALETTE, Card, Modal
 from .forms import SEMANTIC, Badge
 from .render import SmoothImage
+from .tcl_bridge import unbind
 
 class ToastNotification(tk.Toplevel):
     def __init__(self,master,message,*,title='',kind='info',duration=3000,position='bottom-right'):
@@ -59,7 +60,7 @@ class ToastNotification(tk.Toplevel):
         stack=getattr(self.host,'_web_toasts',[])
         if self in stack:stack.remove(self)
         for event,binding in [('<Configure>',self._configure_bind),('<Unmap>',self._unmap_bind),('<Destroy>',self._destroy_bind)]:
-            try:self.host.unbind(event,binding)
+            try:unbind(self.host,event,binding)
             except tk.TclError:pass
         super().destroy()
         for toast in list(stack):toast.reflow()

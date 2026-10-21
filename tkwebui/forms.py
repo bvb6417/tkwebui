@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 from .core import PALETTE, Modal, Card, ProgressSlider, _patch
 from .render import calendar_icon
+from .tcl_bridge import unbind
 
 SEMANTIC={'primary':'#087DFF','success':'#159576','warning':'#B77717','danger':'#D54B58','info':'#197FA8','neutral':'#657080'}
 
@@ -268,7 +269,7 @@ class CalendarPopup(tk.Toplevel):
         if self._closed:return
         self._closed=True
         if self._focus_job is not None:self.after_cancel(self._focus_job)
-        self.host.unbind('<Configure>',self._host_bind)
+        unbind(self.host,'<Configure>',self._host_bind)
         if getattr(self.host,'_choice_popup',None) is self:self.host._choice_popup=None
         self.grab_release();super().destroy()
         if self.previous_grab is not None and self.previous_grab.winfo_exists():self.previous_grab.grab_set()

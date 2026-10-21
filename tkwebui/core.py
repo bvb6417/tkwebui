@@ -8,7 +8,9 @@ from __future__ import annotations
 import math
 import sys
 import tkinter as tk
+from functools import lru_cache
 from tkinter import font as tkfont, ttk
+from .tcl_bridge import unbind
 
 PALETTE = dict(bg='#FFFFFF', sidebar='#F5F5F7', fg='#16181D', muted='#697180',
                border='#E1E2E8', hover='#F1F1F4', active='#E5E5EB',
@@ -27,7 +29,9 @@ def enable_dpi_awareness():
             except (AttributeError, OSError): pass
 
 
+@lru_cache(maxsize=256)
 def _rgb(color):
+    # Raster samplers call this once per subsample with a handful of colors.
     return tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
 
 
@@ -44,31 +48,68 @@ def _patch(root, fill, border, surrounding, radius, height=80, width=192):
                  (0,radius,1,height-radius), (width-1,radius,width,height-radius)):
         image.put(border, to=rect)
     rgb_fill, rgb_border, rgb_bg = map(_rgb, (fill,border,surrounding))
+    # Four bulk corner writes instead of one Tcl call per corner pixel.
+    corner = []
     for y in range(radius):
+        row = []
         for x in range(radius):
             samples = []
             for dx,dy in ((.25,.25),(.75,.25),(.25,.75),(.75,.75)):
                 distance = math.hypot(x+dx-radius,y+dy-radius)
                 samples.append(rgb_fill if distance <= radius-1 else rgb_border if distance <= radius else rgb_bg)
-            color = _blend(samples)
-            for xx,yy in ((x,y),(width-1-x,y),(x,height-1-y),(width-1-x,height-1-y)):
-                image.put(color, to=(xx,yy))
+            row.append(_blend(samples))
+        corner.append(row)
+    for right,bottom in ((False,False),(True,False),(False,True),(True,True)):
+        rows = list(reversed(corner)) if bottom else corner
+        data = ' '.join('{'+' '.join(reversed(row) if right else row)+'}' for row in rows)
+        if radius:image.put(data, to=(width-radius if right else 0, height-radius if bottom else 0))
     return image
 
 
-def _raster(root, width, height, sample, transparent=None):
-    image = tk.PhotoImage(master=root, width=width, height=height)
-    rows = []
+def _raster(root, width, height, sample, transparent=None, outside=None):
+    from .render import _png
+    # One RGBA PNG instead of a hex-string put plus a transparency_set call per
+    # background pixel; uniform 2x2 samples (most pixels) skip the averaging.
+    # ``outside(x, y)`` optionally marks further pixels as fully transparent.
+    transparent = tuple(transparent) if transparent is not None else None
+    rgba = bytearray()
     for y in range(height):
-        rows.append('{'+' '.join(_blend([sample(x+dx,y+dy) for dx,dy in
-                        ((.25,.25),(.75,.25),(.25,.75),(.75,.75))]) for x in range(width))+'}')
-    image.put(' '.join(rows))
-    if transparent is not None:
-        background='#'+''.join(f'{channel:02x}' for channel in transparent)
-        for y,row in enumerate(rows):
-            for x,color in enumerate(row[1:-1].split()):
-                if color==background:image.transparency_set(x,y,True)
-    return image
+        for x in range(width):
+            a,b,c,d = [sample(x+dx,y+dy) for dx,dy in ((.25,.25),(.75,.25),(.25,.75),(.75,.75))]
+            pixel = tuple(a) if a==b==c==d else tuple(round((a[i]+b[i]+c[i]+d[i])/4) for i in range(3))
+            rgba.extend(pixel); rgba.append(0 if pixel==transparent or (outside and outside(x,y)) else 255)
+    return tk.PhotoImage(master=root, data=_png(width,height,bytes(rgba)), format='png')
+
+
+_ICON_HITS={}  # (name, size) -> per-pixel count of 2x2 samples on a stroke
+
+
+def _icon_hits(shapes, size):
+    """2x2 supersampled stroke hits of a 20-unit line icon at ``size`` pixels.
+
+    Same per-sample test as before, but each stroke only tests the samples
+    within its reach; samples elsewhere cannot hit it.
+    """
+    segments,circles,dots=shapes
+    hit=bytearray(size*size*4)
+    offsets=((.25,.25),(.75,.25),(.25,.75),(.75,.75))
+    def visit(left,top,right,bottom,inside):
+        for y in range(max(0,int(top*size/20)-1),min(size,int(bottom*size/20)+2)):
+            for x in range(max(0,int(left*size/20)-1),min(size,int(right*size/20)+2)):
+                base=(y*size+x)*4
+                for i,(dx,dy) in enumerate(offsets):
+                    if not hit[base+i] and inside((x+dx)*20/size,(y+dy)*20/size):hit[base+i]=1
+    for (ax,ay),(bx,by) in segments:
+        vx,vy=bx-ax,by-ay;length=vx*vx+vy*vy or 1
+        def segment(x,y,ax=ax,ay=ay,vx=vx,vy=vy,length=length):
+            t=max(0,min(1,((x-ax)*vx+(y-ay)*vy)/length))
+            return math.hypot(x-ax-t*vx,y-ay-t*vy)<.8
+        visit(min(ax,bx)-.8,min(ay,by)-.8,max(ax,bx)+.8,max(ay,by)+.8,segment)
+    for cx,cy,r in circles:
+        visit(cx-r-.8,cy-r-.8,cx+r+.8,cy+r+.8,lambda x,y,cx=cx,cy=cy,r=r:abs(math.hypot(x-cx,y-cy)-r)<.8)
+    for cx,cy in dots:
+        visit(cx-1.25,cy-1.25,cx+1.25,cy+1.25,lambda x,y,cx=cx,cy=cy:math.hypot(x-cx,y-cy)<1.25)
+    return bytes(sum(hit[i:i+4]) for i in range(0,len(hit),4))
 
 
 def icon(root, name, size=20, color=None, background=None):
@@ -107,18 +148,19 @@ def icon(root, name, size=20, color=None, background=None):
              'settings':[(7,5,2),(13,10,2),(8,15,2)],'info':[(10,10,8)]}
     dots={'more':[(4,10),(10,10),(16,10)],'info':[(10,6)]}
     if name=='info':paths['info']=[[(10,9),(10,14)]]
+    from .render import _png
     foreground,bg=map(_rgb,(color,background))
-    def distance(x,y,a,b):
-        ax,ay=a;bx,by=b;vx,vy=bx-ax,by-ay
-        t=max(0,min(1,((x-ax)*vx+(y-ay)*vy)/(vx*vx+vy*vy or 1)))
-        return math.hypot(x-ax-t*vx,y-ay-t*vy)
-    def sample(x,y):
-        x,y=x*20/size,y*20/size
-        hit=any(distance(x,y,a,b)<.8 for path in paths.get(name,[]) for a,b in zip(path,path[1:]))
-        hit=hit or any(abs(math.hypot(x-cx,y-cy)-r)<.8 for cx,cy,r in circles.get(name,[]))
-        hit=hit or any(math.hypot(x-cx,y-cy)<1.25 for cx,cy in dots.get(name,[]))
-        return foreground if hit else bg
-    cache[key]=_raster(root,size,size,sample,transparent=bg)
+    hits=_ICON_HITS.get((name,size))
+    if hits is None:
+        shapes=([(a,b) for path in paths.get(name,[]) for a,b in zip(path,path[1:])],circles.get(name,[]),dots.get(name,[]))
+        hits=_ICON_HITS[(name,size)]=_icon_hits(shapes,size)
+    # Same pixels as _raster(): k of 4 samples hit -> rounded fg/bg mix, and
+    # pixels equal to the background are transparent.
+    table=[]
+    for k in range(5):
+        pixel=foreground if k==4 else bg if k==0 else tuple(round((k*f+(4-k)*b)/4) for f,b in zip(foreground,bg))
+        table.append(bytes(pixel)+(b'\0' if pixel==bg else b'\xff'))
+    cache[key]=tk.PhotoImage(master=root,data=_png(size,size,b''.join(table[k] for k in hits)),format='png')
     return cache[key]
 
 
@@ -132,7 +174,9 @@ def apply_theme(root, *, font_family='Microsoft YaHei UI', font_size=10, accent=
     scale=root.winfo_fpixels('1i')/96
     px=lambda n:max(1,round(n*scale))
     root.tk.call('tk','scaling',root.winfo_fpixels('1i')/72)
-    if font_family not in tkfont.families(root):font_family=tkfont.nametofont('TkDefaultFont').actual('family')
+    # Resolving one font is instant; tkfont.families() enumerates every
+    # installed font (up to ~1 s on a cold Windows start).
+    if tkfont.Font(root=root,family=font_family).actual('family')!=font_family:font_family=tkfont.nametofont('TkDefaultFont').actual('family')
     for name in ('TkDefaultFont','TkTextFont','TkMenuFont','TkHeadingFont','TkCaptionFont','TkTooltipFont'):
         tkfont.nametofont(name,root=root).configure(family=font_family,size=font_size)
     normal=(font_family,font_size);bold=(font_family,font_size,'bold');small=(font_family,max(9,font_size-1))
@@ -144,7 +188,12 @@ def apply_theme(root, *, font_family='Microsoft YaHei UI', font_size=10, accent=
                     lightcolor=c['bg'],darkcolor=c['bg'],troughcolor=c['hover'])
     style.map('.',foreground=[('disabled',c['disabled'])])
     root.configure(background=c['bg'])
-    root.option_add('*Font','TkDefaultFont')
+    # Classic widget classes only. A bare '*Font' is also read by ttk.Label /
+    # ttk.Entry, whose explicit -font then overrides every style font
+    # (Strong.TLabel, Muted.TLabel, section titles ...).
+    for widget in ('Label','Button','Checkbutton','Radiobutton','Menubutton','Message','Labelframe',
+                   'Scale','Text','Entry','Spinbox','Listbox'):
+        root.option_add(f'*{widget}.Font','TkDefaultFont')
     for widget in ('Text','Listbox','Canvas','Menu'):
         root.option_add(f'*{widget}.background',c['bg'])
     for widget in ('Text','Listbox','Menu'):
@@ -199,8 +248,10 @@ def apply_theme(root, *, font_family='Microsoft YaHei UI', font_size=10, accent=
         style.configure(name,anchor='w',padding=(px(10),px(8)))
     for name in ('Quiet.TButton','CardIcon.TButton','Close.TButton'):style.configure(name,padding=px(5))
     style.configure('Dropdown.TButton',anchor='w')
+    # Fixed width leaves a gap before the label; sticky 'e' keeps the chevron
+    # from being tiled when a layout stretches the element vertically.
     style.element_create('Switch.Dropdown.arrow','image',icon(root,'chevrondown',px(13)),
-                         ('disabled',icon(root,'chevrondown',px(13),color=c['disabled'])))
+                         ('disabled',icon(root,'chevrondown',px(13),color=c['disabled'])),width=px(13)+px(8),sticky='e')
     style.layout('Dropdown.TButton',[('TButton.surface',{'sticky':'nsew','children':[
         ('Button.padding',{'sticky':'nsew','children':[
             ('Switch.Dropdown.arrow',{'side':'right','sticky':''}),
@@ -452,10 +503,36 @@ class ScrollArea(ttk.Frame):
         self.bind_class(self._wheel_tag,'<Destroy>',self.schedule)
         self.bind_class(self._wheel_tag,'<Unmap>',self.schedule)
     def resize(self,event):
-        if self._width!=event.width:
-            self._width=event.width
-            self.canvas.itemconfigure(self.window,width=event.width)
+        # The current width, not the event's: queued <Configure> events carry
+        # intermediate sizes (e.g. before the scrollbar appeared).
+        width=self.canvas.winfo_width()
+        if self._width!=width:
+            self._width=width
+            self.canvas.itemconfigure(self.window,width=width)
         self.schedule()
+    def prepare(self,width,height):
+        """Settle the layout at its final size before the area is first shown.
+
+        The body width, the scrollbar and any <Configure>-driven wrapping
+        depend on window events, which Tk delivers only once the area is on
+        screen: content would appear at its natural width, then widen. Placed
+        just outside its master, the area is laid out here and resized widgets
+        get their <Configure> now; no user input is processed. Afterwards
+        pack/grid/place it as usual.
+        """
+        self.place(x=width+8,y=0,width=width,height=height)
+        def walk(widget):
+            yield widget
+            for child in widget.winfo_children():
+                if not isinstance(child,tk.Toplevel):yield from walk(child)
+        sizes={}
+        for _ in range(8):
+            self.update_idletasks()
+            changed=[w for w in walk(self) if sizes.get(w)!=(w.winfo_width(),w.winfo_height())]
+            if not changed:break
+            for w in changed:
+                sizes[w]=(w.winfo_width(),w.winfo_height())
+                w.event_generate('<Configure>',x=w.winfo_x(),y=w.winfo_y(),width=sizes[w][0],height=sizes[w][1])
     def schedule(self,*_):
         if self._job is None:self._job=self.after_idle(self.refresh)
     def refresh(self):
@@ -1030,8 +1107,8 @@ class Modal(tk.Toplevel):
         if getattr(self.host,'_active_modal',None) is self:self.host._active_modal=None
         for job in (self._show_job,self._position_job,self._round_job,self._ready_job):
             if job is not None:self.after_cancel(job)
-        self.host.unbind('<Configure>',self._host_binding)
-        self.host.unbind('<Escape>',self._escape_binding)
+        unbind(self.host,'<Configure>',self._host_binding)
+        unbind(self.host,'<Escape>',self._escape_binding)
         self.grab_release();self.mask.destroy()
         super().destroy()
         if self.previous_grab is not None and self.previous_grab.winfo_exists():self.previous_grab.grab_set()
