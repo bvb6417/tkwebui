@@ -38,16 +38,16 @@ class ChoicePopup(tk.Toplevel):
             button.pack(fill='x',pady=1)
             button.bind('<Enter>',lambda _,i=index:self.highlight(i))
             self.rows.append(button);height+=button.winfo_reqheight()+2
-        left,top,right,bottom=0,0,self.winfo_screenwidth(),self.winfo_screenheight()
-        chrome=getattr(owner._root(),'_window_chrome',None)
-        if chrome is not None and chrome.attached:
-            info=chrome.work_area()
-            if info:left,top,right,bottom=info.rcWork.left,info.rcWork.top,info.rcWork.right,info.rcWork.bottom
+        from .extras import MenuPopup
+        # The owner may live on a different monitor from the root window.
+        left,top,right,bottom=MenuPopup.work_area(owner.winfo_rootx(),owner.winfo_rooty())
         width=min(width,right-left-16)
         height=min(height,round(430*self.scale),bottom-top-24)
         if above is not None and y+height>bottom-8:y=above-height-4
         x=max(left+8,min(x,right-width-8));y=max(top+8,min(y,bottom-height-8))
-        self.geometry(f'{int(width)}x{int(height)}{int(x):+d}{int(y):+d}')
+        # Keep negative virtual-desktop coordinates relative to the origin,
+        # rather than asking Tk to offset from the right/bottom screen edge.
+        self.geometry(f'{int(width)}x{int(height)}+{int(x)}+{int(y)}')
         self.bind('<Escape>',lambda _:self.close())
         self.bind('<Up>',lambda _:self.move(-1));self.bind('<Down>',lambda _:self.move(1))
         self.bind('<Home>',lambda _:self.highlight(self.enabled()[0]) if self.enabled() else 'break')

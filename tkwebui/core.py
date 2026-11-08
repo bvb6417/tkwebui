@@ -585,14 +585,23 @@ class Tooltip:
     def show(self):
         self.job=None
         if not self.widget.winfo_exists():return
+        from .extras import MenuPopup
+        x=self.widget.winfo_rootx();anchor_y=self.widget.winfo_rooty()
+        left,top,right,bottom=MenuPopup.work_area(x,anchor_y)
         self.window=tk.Toplevel(self.widget)
+        self.window.withdraw()
         self.window.overrideredirect(True)
         self.window.attributes('-topmost',True)
         content=self.text() if callable(self.text) else self.text
-        ttk.Label(self.window,text=content,padding=(10,6),background='#252831',foreground='#FFFFFF').pack()
+        ttk.Label(self.window,text=content,padding=(10,6),background='#252831',foreground='#FFFFFF',
+                  wraplength=max(1,right-left-36)).pack()
         self.window.update_idletasks()
-        x=min(self.widget.winfo_rootx(),self.widget.winfo_screenwidth()-self.window.winfo_reqwidth()-8)
-        self.window.geometry(f'+{x}+{self.widget.winfo_rooty()+self.widget.winfo_height()+6}')
+        width=self.window.winfo_reqwidth();height=self.window.winfo_reqheight()
+        y=anchor_y+self.widget.winfo_height()+6
+        if y+height>bottom-8:y=anchor_y-height-6
+        x=max(left+8,min(x,right-width-8));y=max(top+8,min(y,bottom-height-8))
+        self.window.geometry(f'+{int(x)}+{int(y)}')
+        self.window.deiconify()
     def hide(self,event=None):
         if self.job is not None:
             self.widget.after_cancel(self.job);self.job=None
