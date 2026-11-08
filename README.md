@@ -6,7 +6,7 @@
 - **不用图片素材**：圆角、图标、开关、仪表等图形都在内存中按 DPI 生成，没有外部 PNG 皮肤文件。
 - **控件多**：覆盖常规 ttk 控件，并提供 Excel 式单元格表格、原生交互图表、日期选择、表单校验、轻提示、数据管理表格、颜色/字体选择等扩展组件。
 - **旧代码好接入**：以 ttk 为主的旧工具，创建窗口后调用一次 `apply_theme(root)`，大部分界面就会换上新样式。
-- **复制即用**：不走 pip，下载后把 `tkwebui` 文件夹放进自己的项目即可 import，想改哪里直接改源码。
+- **安装或复制即用**：支持 `pip install tkwebui`，也可下载后把 `tkwebui` 文件夹放进自己的项目，想改哪里直接改源码。
 
 > A modern, Web-style theme and widget set for Python's built-in tkinter/ttk. Standard library only,
 > no image assets, includes an Excel-like spreadsheet with copy/paste and native interactive charts.
@@ -33,6 +33,14 @@
 ¹ 同一窗口套用主题与不套用主题相比，Windows 11、150% 缩放下实测。两个库不要在同一个 Tk 解释器里混用。
 
 ## 快速开始
+
+安装控件库：
+
+```bash
+python -m pip install tkwebui
+```
+
+需要 Python 3.8+ 和可用的 Tkinter；Linux 可能需要通过系统包管理器安装 `python3-tk`。wheel 安装控件库，完整演示程序在 GitHub 源码和源码发行包中。
 
 1. 在本页点击 **Code → Download ZIP** 并解压（或 `git clone`）。
 2. 运行演示，看看所有控件（共 12 页）：

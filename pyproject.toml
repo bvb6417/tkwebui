@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tkwebui"
+dynamic = ["version"]
+description = "Modern Web-style themes and widgets for tkinter and ttk"
+readme = "README.pypi.md"
+requires-python = ">=3.8"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "bvb6417 and TkWebUI contributors"}]
+keywords = ["tkinter", "ttk", "gui", "widgets", "theme"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: User Interfaces",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/bvb6417/tkwebui"
+Documentation = "https://github.com/bvb6417/tkwebui#readme"
+Issues = "https://github.com/bvb6417/tkwebui/issues"
+Changelog = "https://github.com/bvb6417/tkwebui/blob/main/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "tkwebui/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tkwebui"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/tkwebui", "/tests", "/docs", "/examples",
+    "/demo.py", "/LICENSE", "/README.md",
+    "/README.pypi.md", "/CHANGELOG.md", "/pyproject.toml",
+]
