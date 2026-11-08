@@ -400,7 +400,7 @@ class MenuPopup(tk.Toplevel):
             y=min(y,owner.winfo_rooty()-height-self.px(4))
         x=max(left+self.px(8),min(x,right-width-self.px(8)))
         y=max(top+self.px(8),min(y,bottom-height-self.px(8)))
-        self.geometry(f'{width}x{height}{int(x):+d}{int(y):+d}')
+        self.geometry(f'{width}x{height}+{int(x)}+{int(y)}')
         self.bind('<Up>',lambda e:self.move(-1));self.bind('<Down>',lambda e:self.move(1))
         self.bind('<Home>',lambda e:self.highlight(next(iter(self.enabled()),None)))
         self.bind('<End>',lambda e:self.highlight(self.enabled()[-1] if self.enabled() else None))
